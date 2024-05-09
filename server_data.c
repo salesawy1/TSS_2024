@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+
 ///////////////////////////////////////////////////////////////////////////////////
 //                                 Functions
 ///////////////////////////////////////////////////////////////////////////////////
@@ -909,7 +910,7 @@ bool build_json_telemetry(struct eva_data_t* eva, int team_index, bool completed
     "\n\t}"
     "\n}";
 
-    char out_buffer[512];
+    char out_buffer[2048];
     sprintf(out_buffer, format_buffer, 
         eva->total_time,
 
@@ -960,8 +961,8 @@ bool build_json_telemetry(struct eva_data_t* eva, int team_index, bool completed
         eva->eva2.coolant_liquid_pressure
     );
 
-    char filenameTemplate[48] = "public/json_data/teams/%d/%sTELEMETRY.json";
-    char out_filename[48];
+    char filenameTemplate[64] = "public/json_data/teams/%d/%sTELEMETRY.json";
+    char out_filename[64];
     sprintf(out_filename, filenameTemplate, 
         team_index,
         completed ? "Completed_" : "");
@@ -1265,8 +1266,18 @@ bool update_resource(char* request_content, struct backend_data_t* backend){
     return false;
 }
 
+// Simulation helper
+double random_normal(double mean, double std) {
+  double x = (double)random() / RAND_MAX,
+         y = (double)random() / RAND_MAX,
+         z = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
+  return mean + z * std;
+}
+
 // -------------------------- Simulation --------------------------------
 void simulate_backend(struct backend_data_t* backend){
+
+    srand(time(NULL));
 
     // increment server time
     int new_time = time(NULL) - backend->start_time;
@@ -1275,6 +1286,26 @@ void simulate_backend(struct backend_data_t* backend){
         backend->server_up_time = new_time;
         time_incremented = true;
     }
+
+    double motionvec[2] = {2.0, 0.0};
+    double eva1pos[2] = {1500.0, 1500.0};
+    double eva2pos[2] = {1550.0, 1550.0};
+
+    double top_left_easting = 298305;
+    double top_left_northing = 3272438;
+
+    double bot_right_easting = 298405;
+    double bot_right_northing = 3272330;
+
+    backend->imu.eva1_posx = 20;
+    backend->imu.eva1_posy = 20;
+    backend->imu.eva2_posx = 50;
+    backend->imu.eva2_posy = 50;
+
+    update_imu("eva1_posx", &backend->imu);
+    update_imu("eva1_posy", &backend->imu);
+    update_imu("eva2_posx", &backend->imu);
+    update_imu("eva2_posy", &backend->imu);
 
     // Simulated EVA once per second
     if(time_incremented){
@@ -1303,6 +1334,39 @@ void simulate_backend(struct backend_data_t* backend){
                 // Update Telemetry Json
                 build_json_telemetry(&backend->evas[i], i, false);
 
+                // Update location of EVA participants
+                motionvec[0] = cos(eva->total_time / 20.0);
+                motionvec[1] = sin(eva->total_time / 20.0);
+
+                double mag = pow(motionvec[0] * motionvec[0] + motionvec[1] * motionvec[1], 0.5);
+                motionvec[0] = 1.0 * motionvec[0] / mag;
+                motionvec[1] = 1.0 * motionvec[1] / mag;
+                
+                eva1pos[0] = 20 + 5 * cos(eva->total_time / 20.0) + random_normal(0, 0.5);
+                eva1pos[1] = 20 + 5 * sin(eva->total_time / 20.0) + random_normal(0, 0.5);
+
+                eva2pos[0] = 50 + 5 * cos(eva->total_time / 20.0) + random_normal(0, 0.5);
+                eva2pos[1] = 50 + 5 * sin(eva->total_time / 20.0) + random_normal(0, 0.5);
+
+                backend->imu.eva1_posx = eva1pos[0] + top_left_easting;
+                backend->imu.eva1_posy = top_left_northing - eva1pos[1];
+                
+                backend->imu.eva2_posx = eva2pos[0] + top_left_easting;
+                backend->imu.eva2_posy = top_left_northing - eva2pos[1];
+
+                printf("%d\n", eva->total_time);
+                printf("%.2f %.2f\n", motionvec[0], motionvec[1]);
+
+                printf("\n");
+
+                update_imu("eva1_posx", &backend->imu);
+                update_imu("eva1_posy", &backend->imu);
+                update_imu("eva2_posx", &backend->imu);
+                update_imu("eva2_posy", &backend->imu);
+
+                //backend->imu = new_imu_data;
+
+                build_json_imu(&backend->imu);
             }
             
         }
