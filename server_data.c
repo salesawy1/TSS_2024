@@ -1354,6 +1354,23 @@ void simulate_backend(struct backend_data_t* backend){
                 backend->imu.eva2_posx = eva2pos[0] + top_left_easting;
                 backend->imu.eva2_posy = top_left_northing - eva2pos[1];
 
+
+                // how do we derive the formula that we need for atan2?
+                // well, the general equation for our circular motion, accounting
+                // for the fact that we are doing NORTHING - sin(t), is:
+                // X = < cos(t), C - sin(t) >
+                // This gives us a tangent vector:
+                // T = < -sin(t), -cos(t) >
+                // And so we might think that in order to get the angle for the heading,
+                // we need to do:
+                // arctan(-cos(t) / -sin(t)), or atan2(-cos(t), -sin(t))
+                // HOWEVER:
+                // That will give us the counterclockwise angle starting at 0 from the x-axis
+                // We need the *clockwise* angle starting at 0 from the y-axis
+                // And so we swap the x- and y-components when plugging into atan2
+                backend->imu.eva1_heading = 180 * atan2(-1 * sin(eva->total_time / 20.0), -1 * cos(eva->total_time / 20.0)) / 3.1416;
+                backend->imu.eva2_heading = backend->imu.eva1_heading;
+
                 printf("%d\n", eva->total_time);
                 printf("%.2f %.2f\n", motionvec[0], motionvec[1]);
 
