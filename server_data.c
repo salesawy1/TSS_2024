@@ -1067,6 +1067,8 @@ bool build_json_telemetry(struct eva_data_t *eva, int team_index, bool completed
         "\n\t}"
         "\n}";
 
+    fprintf(stderr, "Total Time: %u\n", eva->total_time);
+
     char out_buffer[2048];
     sprintf(out_buffer, format_buffer,
             eva->total_time,
@@ -1126,6 +1128,7 @@ bool build_json_telemetry(struct eva_data_t *eva, int team_index, bool completed
     // Write bytes to file
     FILE *fd_tel = fopen(out_filename, "w");
     size_t bytes_written = fwrite(out_buffer, 1, strlen(out_buffer), fd_tel);
+    fclose(fd_tel);
     return bytes_written == strlen(out_buffer);
 }
 
